@@ -7,12 +7,12 @@ import { logout } from '../services/authServices.js'
 const router = express.Router()
 
 //registration
-router.post('/register', reqValidator, ratelimiter, regCredVerification)
+router.post('/auth/register', reqValidator, ratelimiter, regCredVerification)
 
 //login
-router.post('/login', reqValidator, ratelimiter,  logCredVerification)
+router.post('/auth/login', reqValidator, ratelimiter,  logCredVerification)
 
 //logout
-router.post('/logout', ratelimiter, tokenVerification,  logout)
+router.post('/auth/logout', ratelimiter, tokenVerification,  logout)
 
 export default router

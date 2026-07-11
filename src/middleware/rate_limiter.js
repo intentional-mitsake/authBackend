@@ -2,9 +2,14 @@ import { createClient } from 'redis';
 import { ratelimitConfig } from '../config/ratelimitConfigs.js';
 import { fallBackRedis } from '../services/redisFallback.js';
 
-const redisClient = createClient( { url: process.env.REDIS_URL || "redis://localhost:6379" });
-redisClient.on('error', (err) => console.error("Redis Client Error", err));
-redisClient.connect().catch(console.error);
+const redisClient = createClient( { 
+  url: process.env.REDIS_URL || "redis://localhost:6379" ,
+  socket: {
+    reconnectStrategy: false
+  }
+});
+//redisClient.on('error', (err) => console.error("Redis Client Error", err));
+//redisClient.connect().catch(console.error);
 
 // bytebytego for reference
 // so its pretty much del unused logs and aldd logs for succesful req
@@ -23,13 +28,12 @@ export async function ratelimiter(req, res, next) {
     // chacks if redis is ready, if not, it waits and then checks again
     // for the fall back--> redis needs an outer configurtaion, so it can be not ready here
     // ioredis is native/built in node module so it is always ready, that is gonna be the fall back
-    let multi;
+    let multi;// for race conditions, procides atomic operations
     if(!redisClient.isReady){
       multi = fallBackRedis.multi();
     } else {
       multi = redisClient.multi();
     }
-    const multi = redisClient.multi(); // for race conditions, procides atomic operations
     // 1. (key, min, max)--> rmvs all el in a sorted set at key with a score between (min, max)
     multi.zRemRangeByScore(id, 0, windowStart);
 
