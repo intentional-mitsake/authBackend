@@ -11,7 +11,7 @@ export async function registration(email, password, username) {
         const newUser = await prisma.user.create({
             data: { email, username, password: hpw, createdAt: created}
         })
-        if(!process.env.JWT_SECRET_KEY) { throw new ErrorI("JWT KEY not set in enviroment variables")}
+        if(!process.env.JWT_SECRET_KEY) { throw new Error("JWT KEY not set in enviroment variables")}
         //payload here is userid, sign is JWT SECRET KEY--> we get userid during token verification(authMiddleware) because the payload is userid
         //if we want to get more than just userid during tokenVerfication for protected route functionalites we need to add those fields into the payload as well
         const token =  jwt.sign({ id: newUser.id}, process.env.JWT_SECRET_KEY, { expiresIn: '1h' })

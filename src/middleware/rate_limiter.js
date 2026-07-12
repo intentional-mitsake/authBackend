@@ -8,8 +8,8 @@ const redisClient = createClient( {
     reconnectStrategy: false
   }
 });
-//redisClient.on('error', (err) => console.error("Redis Client Error", err));
-//redisClient.connect().catch(console.error);
+redisClient.on('error', (err) => console.error("Redis Client Error", err));
+redisClient.connect().catch(console.error);
 
 // bytebytego for reference
 // so its pretty much del unused logs and aldd logs for succesful req
