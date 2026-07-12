@@ -1,6 +1,7 @@
 import { createClient } from 'redis';
 import { ratelimitConfig } from '../config/ratelimitConfigs.js';
 import { fallBackRedis } from '../services/redisFallback.js';
+import { logger } from '../utils/logger.js';
 
 const redisClient = createClient( { 
   url: process.env.REDIS_URL || "redis://localhost:6379" ,
@@ -8,8 +9,9 @@ const redisClient = createClient( {
     reconnectStrategy: false
   }
 });
-redisClient.on('error', (err) => console.error("Redis Client Error", err));
-redisClient.connect().catch(console.error);
+
+redisClient.on('error', (err) => logger.error(err, "Redis Client Error"));
+redisClient.connect().catch((err) => logger.error({ err }, 'Redis connection failed'));
 
 // bytebytego for reference
 // so its pretty much del unused logs and aldd logs for succesful req
@@ -17,7 +19,6 @@ redisClient.connect().catch(console.error);
 // use redis sorted sets for logs
 export async function ratelimiter(req, res, next) {
   try{
-    console.log("ratelimiter middleware")
     const windowSize = ratelimitConfig.window; // in milliseconds--> diff btwn timestamps
     const maxRequests = ratelimitConfig.max;
 
@@ -56,15 +57,18 @@ export async function ratelimiter(req, res, next) {
         'X-RateLimit-Remaining': Math.max(0, maxRequests - count),
         'X-RateLimit-Reset': Math.ceil((windowStart + windowSize) / 1000), // end of curr winodw
       });
-      
+    
     // 3. if log size is same/lowr than allowed, accept, else reject
     if (count <= maxRequests) {
+      logger.info("Request Accepted");
+      logger.info({ remaining: Math.max(0, maxRequests - count), reset: Math.ceil((windowStart + windowSize) / 1000) }, 'Rate limit info');
       next();
     } else {
+      logger.warn("Limit Exceeded");
       return res.status(429).json({ error: ratelimitConfig.message });
     }   
   } catch(err) {
-    console.error('Rate Limiter Error:', err);
+    logger.error(err, "Rate Limiter Error")
     return res.status(500).json({ error: err.message || "Internal Server Error"})
   }
 }

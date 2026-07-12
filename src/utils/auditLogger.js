@@ -17,3 +17,5 @@ export async function auditLogger(userid, action, data) {
         logger.error(err);
     }
 }
+
+export default auditLogger
