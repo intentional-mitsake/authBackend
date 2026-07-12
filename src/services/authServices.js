@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
 import auditLogger from '../utils/auditLogger.js';
+import { metrics } from '../utils/metrics.js';
 
 const prisma = new PrismaClient()
 
@@ -30,6 +31,7 @@ export async function registration(email, password, username, ip) {
         })
         logger.info({ email, username }, "User Logged In");
         await auditLogger(newUser.id, "Registration", `ip: ${ip}: User Registered`);
+        metrics.tokens_issued_total++;
         return token
 
     }catch(err)
@@ -58,9 +60,11 @@ export async function login(user, password, ip) {
                        })    
                 logger.info({ userId: user.id }, "User Logged In");
                 await auditLogger(user.id, "Login", `ip: ${ip} : User Logged In`);
+                metrics.tokens_issued_total++;
                 return log_token
             }
         else{
+            metrics.auth_failures_total++;
             await auditLogger(user.id, "Login", `ip: ${ip} : Incorrect Password`);
             throw new Error("Password Incorrect")
         }

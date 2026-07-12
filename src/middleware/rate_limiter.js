@@ -2,8 +2,9 @@ import { createClient } from 'redis';
 import { ratelimitConfig } from '../config/ratelimitConfigs.js';
 import { fallBackRedis } from '../services/redisFallback.js';
 import { logger } from '../utils/logger.js';
+import { metrics } from '../utils/metrics.js';
 
-const redisClient = createClient( { 
+export const redisClient = createClient( { 
   url: process.env.REDIS_URL || "redis://localhost:6379" ,
   socket: {
     reconnectStrategy: false
@@ -60,6 +61,7 @@ export async function ratelimiter(req, res, next) {
     
     // 3. if log size is same/lowr than allowed, accept, else reject
     if (count <= maxRequests) {
+      metrics.requests_total++;// incrment req count
       logger.info("Request Accepted");
       logger.info({ remaining: Math.max(0, maxRequests - count), reset: Math.ceil((windowStart + windowSize) / 1000) }, 'Rate limit info');
       next();

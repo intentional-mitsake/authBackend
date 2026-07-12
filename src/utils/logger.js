@@ -1,5 +1,4 @@
 import pino from 'pino';
-import { version } from 'react';
 
 export const logger = pino({
     level: process.env.LOG_LEVEL || 'info',
