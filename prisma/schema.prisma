@@ -43,3 +43,15 @@ model Log {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   session      Session?  @relation(fields: [u_token], references: [token], onDelete: SetNull)
 }
+
+model AuditLog {
+  id           String @id @default(uuid())
+  userId       Int?
+  action       String
+  data         Json?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+}
