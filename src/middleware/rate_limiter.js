@@ -17,6 +17,7 @@ redisClient.connect().catch(console.error);
 // use redis sorted sets for logs
 export async function ratelimiter(req, res, next) {
   try{
+    console.log("ratelimiter middleware")
     const windowSize = ratelimitConfig.window; // in milliseconds--> diff btwn timestamps
     const maxRequests = ratelimitConfig.max;
 

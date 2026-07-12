@@ -36,6 +36,9 @@ export async function login(user, password) {
         const match = await bcrypt.compare(password, user.password)//it hashes the pw user provides and compares wiht the hashed pw from DB. Returns true or false
         if(match) { 
                 if(!process.env.JWT_SECRET_KEY) { throw new Error("JWT KEY not set in enviroment variables")}
+                //del old sessiosn
+                await prisma.session.deleteMany({ where: { userId: user.id } });
+                
                 const log_token =  jwt.sign({ id: user.id}, process.env.JWT_SECRET_KEY, { expiresIn: '1h' })
                 const log_tokenGen = await prisma.session.create({
                      data: { userId: user.id, token: log_token, createdAt: new Date(Date.now()), expiresAt: new Date(Date.now() + 60 * 60 * 1000) }

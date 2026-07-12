@@ -1,6 +1,6 @@
 export const ratelimitConfig = {
-    window: 60 * 60 * 1000, // 1 hour in milliseconds
-    max: 100, // limit each IP to 100 requests per window
+    window: 60 * 1000, // 1 minute in milliseconds
+    max: 5, // limit each IP to 5 requests per window
     message: 'Too many requests. Please try again later.'
 };
 
