@@ -47,4 +47,30 @@ export async function revokeRefreshToken(refreshToken) {
     await prisma.refreshToken.updateMany({ where: { tokenHash: hashedRefToken }, data: { used: true } });
 }
 
-export default { generateTokens, rotateRefreshToken, revokeRefreshToken };
+export async function listActiveSessions(userId) {
+    logger.info({ userId }, "Sessions Fetched");
+    // list all user sessions with valid refresh tokens
+    return await prisma.refreshToken.findMany({ 
+        where: { 
+            userId, 
+            used: false, 
+            expiresAt: { gt: new Date(Date.now()) },
+        }, 
+        select: {
+            familyId: true,
+            createdAt: true,
+            lastUsedAt: true
+        }
+    });
+}
+
+export async function revokeSession(userId, familyId) {
+    logger.info({ userId, familyId }, "Session Revoked");
+    const { count } =await prisma.refreshToken.updateMany({ 
+        where: { userId, familyId }, 
+        data: { used: true } 
+    });
+    if(count === 0) { throw new Error("Session Not Found") }
+}
+
+export default { generateTokens, rotateRefreshToken, revokeRefreshToken, listActiveSessions, revokeSession };

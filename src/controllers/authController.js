@@ -3,7 +3,7 @@
 import { PrismaClient } from '@prisma/client';
 import { registration, login } from '../services/authServices.js';
 import { logger } from '../utils/logger.js';
-import { rotateRefreshToken } from '../services/tokenServices.js';
+import { rotateRefreshToken, listActiveSessions, revokeSession } from '../services/tokenServices.js';
 
 
 const prisma = new PrismaClient();
@@ -67,6 +67,29 @@ export async function logCredVerification(req, res) {
         return res.status(500).json({ error: err.message || "Internal Server Error"});
     }
     
+}
+
+export async function stateController(req, res) {
+    try{
+        const activeSessions = await listActiveSessions(req.user.id);
+        logger.info({ activeSessions }, "State");
+        return res.status(200).json({ activeSessions });
+    }catch(err){
+        logger.error(err, "State Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error"});
+    }
+}
+
+export async function sessionController(req, res) {
+    try {
+        const { userId, familyId } = req.params;
+        await revokeSession(userId, familyId);
+        logger.info({ userId, familyId }, "Session Revoked");
+        return res.status(200).json({ msg: "Session Revoked"});
+    } catch (err) {
+        logger.error(err, "Session Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error"});
+    }
 }
 
 export async function rotateController(req, res) {
