@@ -66,6 +66,8 @@ model RefreshToken {
   expiresAt    DateTime
   user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
   used         Boolean @default(false)
+  familyId     String
+  deviceLabel  String?
 
   @@index([userId])
 }
