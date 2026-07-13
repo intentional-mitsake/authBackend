@@ -20,8 +20,6 @@ model User {
   username       String   @unique
   emailVerified  DateTime?
   createdAt      DateTime @default(now())
-  sessions       Session[]
-  logs           Log[]   
   refreshTokens  RefreshToken[]
 }
 

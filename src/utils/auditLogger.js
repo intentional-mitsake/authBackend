@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 export async function auditLogger(userid, action, data) {
     try {
-        await prisma.auditlog.create({
+        await prisma.auditLog.create({
             data: {
                 userId: userid,
                 action: action,

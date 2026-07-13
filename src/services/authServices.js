@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
 import auditLogger from '../utils/auditLogger.js';
 import { metrics } from '../utils/metrics.js';
-import { generateTokens } from './tokenServices.js';
+import { rotateRefreshToken, generateTokens, revokeRefreshToken } from './tokenServices.js';
 import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient()
@@ -43,9 +43,6 @@ export async function login(user, password, ip) {
                 if(!process.env.JWT_SECRET_KEY) { 
                     throw new Error("JWT KEY not set in enviroment variables");
                 }
-                //del old sessiosn
-                await prisma.session.deleteMany({ where: { userId: user.id } });
-                logger.info("Old Sessions Deleted");
                 const { accessToken, refreshToken, hashedRefToken } =  generateTokens({ id: user.id }); 
                 await prisma.refreshToken.create({
                     data : { tokenHash: hashedRefToken, userId: user.id, familyId: randomUUID(), createdAt: new Date(Date.now()), expiresAt: new Date(Date.now() + 60 * 60 * 1000) }
@@ -69,10 +66,9 @@ export async function login(user, password, ip) {
 export async function logout(req, res) {
     try{
         const userid = req.userid
-        const token = req.token
-        await prisma.log.update({where: {userId: userid, u_token: token}, data: { logout_time: new Date(Date.now())}})
-        await prisma.session.delete({where: {token}})
-        
+        const refreshToken = req.token
+        await revokeRefreshToken(refreshToken);
+        await auditLogger(userid, "Logout", {});
         logger.info({ userid }, "User Logged Out");
         return res.status(200).json({msg: "User Logged Out"})
     }catch(err){
