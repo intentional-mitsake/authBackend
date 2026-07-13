@@ -25,26 +25,6 @@ model User {
   refreshTokens  RefreshToken[]
 }
 
-model Session {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  token        String   @unique
-  createdAt    DateTime @default(now())
-  expiresAt    DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  logs         Log[]   
-}
-
-model Log {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  u_token      String?   @unique
-  login_time   DateTime @default(now())
-  logout_time  DateTime? 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  session      Session?  @relation(fields: [u_token], references: [token], onDelete: SetNull)
-}
-
 model AuditLog {
   id           String @id @default(uuid())
   userId       Int?
