@@ -18,24 +18,24 @@ export function generateTokens(payload) {
 }
 
 export async function rotateRefreshToken(refreshToken) {
-    const hashedRefToken = createHash('sha256').update(refreshToken).digest('hex');
-    const tokenExists = await prisma.refreshToken.findFirst({ where: { tokenHash: hashedRefToken } });
+        const hashedRefToken = createHash('sha256').update(refreshToken).digest('hex');
+        const tokenExists = await prisma.refreshToken.findFirst({ where: { tokenHash: hashedRefToken } });
 
-     if(!tokenExists) { throw new Error("Invalid Refresh Token") }
-     if( tokenExists.used || tokenExists.expiresAt < new Date(Date.now())) { 
+        if(!tokenExists) { throw new Error("Invalid Refresh Token") }
+        if( tokenExists.used || tokenExists.expiresAt < new Date(Date.now())) { 
         await invalidateFamily(tokenExists.familyId);
         throw new Error("Refresh Token Expired");
-     }
-     await prisma.refreshToken.update({
+        }
+        await prisma.refreshToken.update({
         where: { id: tokenExists.id },
         data: { used: true }
-     });
-     const { accessToken, refreshToken: newRefreshToken, hashedRefToken: newHashedRefToken } = generateTokens({ id: tokenExists.userId }); 
-     await prisma.refreshToken.create({
+        });
+        const { accessToken, refreshToken: newRefreshToken, hashedRefToken: newHashedRefToken } = generateTokens({ id: tokenExists.userId }); 
+        await prisma.refreshToken.create({
         // in the same family
         data: { tokenHash: newHashedRefToken, userId: tokenExists.userId, familyId: tokenExists.familyId, createdAt: new Date(Date.now()), expiresAt: new Date(Date.now() + 7 * 24 *60 * 60 * 1000) }
-     });
-     return { accessToken , newRefreshToken };
+        });
+        return { accessToken , newRefreshToken };
 }
 
 export async function invalidateFamily(familyId) {

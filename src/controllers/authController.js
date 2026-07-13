@@ -3,6 +3,7 @@
 import { PrismaClient } from '@prisma/client';
 import { registration, login } from '../services/authServices.js';
 import { logger } from '../utils/logger.js';
+import { rotateRefreshToken } from '../services/tokenServices.js';
 
 
 const prisma = new PrismaClient();
@@ -66,4 +67,30 @@ export async function logCredVerification(req, res) {
         return res.status(500).json({ error: err.message || "Internal Server Error"});
     }
     
+}
+
+export async function rotateController(req, res) {
+    try {
+        if (!req.cookies) {
+            return res.status(400).json({ error: "Cookies not found"});
+        }
+            const refreshToken = req.cookies.refreshToken
+            if (!refreshToken){ 
+                return res.status(400).json({ error: "Refresh Token Not Found"});
+            }
+            const { accessToken, refreshToken: newRefreshToken } = await rotateRefreshToken(refreshToken);
+            res.cookie(
+                'refreshToken', newRefreshToken, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production' ? true : false,
+                    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+                    maxAge: 7 * 24 * 60 * 60 * 1000
+                }
+            )
+            return res.status(200).json({ accessToken });
+        }catch(err){
+            logger.error(err, "Error while rotating refresh token");
+            // throwing err in case of empty cookei, so 400
+            return res.status(500).json({ error: err.message || "Internal Server Error"});
+        }
 }

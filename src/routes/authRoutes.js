@@ -1,6 +1,6 @@
 import express from 'express'
 import { registerValidator, logValidator } from '../middleware/ authValidator.js'
-import { regCredVerification, logCredVerification } from '../controllers/authController.js'
+import { regCredVerification, logCredVerification, rotateController } from '../controllers/authController.js'
 import { ratelimiter } from '../middleware/rate_limiter.js'
 import { tokenVerification } from '../middleware/authMiddleware.js'
 import { logout } from '../services/authServices.js'
@@ -16,7 +16,7 @@ router.post('/auth/register', ratelimiter, registerValidator, regCredVerificatio
 
 //login
 router.post('/auth/login', ratelimiter, logValidator, logCredVerification)
-router.post('/auth/refresh', ratelimiter, rotateRefreshToken)
+router.post('/auth/refresh', ratelimiter, rotateController, rotateRefreshToken)
 
 //logout
 router.post('/auth/logout', ratelimiter, tokenVerification,  logout)
