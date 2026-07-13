@@ -30,7 +30,7 @@ export async function rotateRefreshToken(refreshToken) {
         where: { id: tokenExists.id },
         data: { used: true }
      });
-     const { accessToken, newRefreshToken, newHashedRefToken } = generateTokens({ id: tokenExists.userId }); 
+     const { accessToken, refreshToken: newRefreshToken, hashedRefToken: newHashedRefToken } = generateTokens({ id: tokenExists.userId }); 
      await prisma.refreshToken.create({
         // in the same family
         data: { tokenHash: hashedRefToken, userId: tokenExists.userId, familyId: tokenExists.familyId, createdAt: new Date(Date.now()), expiresAt: new Date(Date.now() + 7 * 24 *60 * 60 * 1000) }
