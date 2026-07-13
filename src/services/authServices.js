@@ -4,6 +4,8 @@ import { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
 import auditLogger from '../utils/auditLogger.js';
 import { metrics } from '../utils/metrics.js';
+import { generateTokens } from './tokenServices.js';
+import { randomUUID } from 'crypto';
 
 const prisma = new PrismaClient()
 
@@ -15,25 +17,18 @@ export async function registration(email, password, username, ip) {
             data: { email, username, password: hpw, createdAt: created}
         })
         logger.info({ email, username }, "User Registered");
-        if(!process.env.JWT_SECRET_KEY) { 
-            throw new Error("JWT KEY not set in enviroment variables");
-        }
         //payload here is userid, sign is JWT SECRET KEY--> we get userid during token verification(authMiddleware) because the payload is userid
         //if we want to get more than just userid during tokenVerfication for protected route functionalites we need to add those fields into the payload as well
-        const token =  jwt.sign({ id: newUser.id}, process.env.JWT_SECRET_KEY, { expiresIn: '1h' })
+        const { accessToken, refreshToken, hashedRefToken } = generateTokens({ id: newUser.id });// pasing id as payload
         logger.info({userId: newUser.id}, "Token Generated");
-        const tokenExp = new Date(Date.now() + 60 * 60 * 1000)
-        const tokenGen = await prisma.session.create({
-            data: { userId: newUser.id, token, createdAt: created, expiresAt: tokenExp }
-        })
-        const log = await prisma.log.create({
-            data: { userId: newUser.id, u_token: token, login_time: new Date(Date.now()) }
-        })
+        const tokenExp = new Date(Date.now() + 60 * 60 * 1000);
+        await prisma.refreshToken.create({
+            data: { tokenHash: hashedRefToken, userId: newUser.id, familyId: randomUUID(), createdAt: created, expiresAt: tokenExp }
+        });
         logger.info({ email, username }, "User Logged In");
         await auditLogger(newUser.id, "Registration", `ip: ${ip}: User Registered`);
         metrics.tokens_issued_total++;
-        return token
-
+        return { accessToken, refreshToken }
     }catch(err)
     {
         logger.error(err, "Registration Error")
@@ -51,17 +46,14 @@ export async function login(user, password, ip) {
                 //del old sessiosn
                 await prisma.session.deleteMany({ where: { userId: user.id } });
                 logger.info("Old Sessions Deleted");
-                const log_token =  jwt.sign({ id: user.id}, process.env.JWT_SECRET_KEY, { expiresIn: '1h' })
-                const log_tokenGen = await prisma.session.create({
-                     data: { userId: user.id, token: log_token, createdAt: new Date(Date.now()), expiresAt: new Date(Date.now() + 60 * 60 * 1000) }
-                    })
-                const log = await prisma.log.create({
-                     data: { userId: user.id, u_token: log_token, login_time: new Date(Date.now()) }
-                       })    
+                const { accessToken, refreshToken, hashedRefToken } =  generateTokens({ id: user.id }); 
+                await prisma.refreshToken.create({
+                    data : { tokenHash: hashedRefToken, userId: user.id, familyId: randomUUID(), createdAt: new Date(Date.now()), expiresAt: new Date(Date.now() + 60 * 60 * 1000) }
+                })
                 logger.info({ userId: user.id }, "User Logged In");
                 await auditLogger(user.id, "Login", `ip: ${ip} : User Logged In`);
                 metrics.tokens_issued_total++;
-                return log_token
+                return { accessToken, refreshToken };
             }
         else{
             metrics.auth_failures_total++;
