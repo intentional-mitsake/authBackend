@@ -15,7 +15,7 @@ const router = express.Router()
 router.post('/auth/register', ratelimiter, registerValidator, regCredVerification)
 
 //login
-router.post('/auth/login', ratelimiter, logValidator, logCredVerification, tokenVerification)
+router.post('/auth/login', ratelimiter, logValidator, logCredVerification)
 router.post('/auth/refresh', ratelimiter, rotateRefreshToken)
 
 //logout
