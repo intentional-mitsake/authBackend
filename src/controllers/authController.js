@@ -91,6 +91,9 @@ export async function rotateController(req, res) {
         }catch(err){
             logger.error(err, "Error while rotating refresh token");
             // throwing err in case of empty cookei, so 400
+            if (err.message === "Invalid Refresh Token" || err.message === "Refresh Token Expired") {
+                return res.status(401).json({ error: err.message});
+            }
             return res.status(500).json({ error: err.message || "Internal Server Error"});
         }
 }

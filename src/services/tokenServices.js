@@ -23,8 +23,8 @@ export async function rotateRefreshToken(refreshToken) {
 
         if(!tokenExists) { throw new Error("Invalid Refresh Token") }
         if( tokenExists.used || tokenExists.expiresAt < new Date(Date.now())) { 
-        await invalidateFamily(tokenExists.familyId);
-        throw new Error("Refresh Token Expired");
+            await invalidateFamily(tokenExists.familyId);
+            throw new Error("Refresh Token Expired");
         }
         await prisma.refreshToken.update({
         where: { id: tokenExists.id },
