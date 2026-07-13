@@ -22,6 +22,7 @@ model User {
   createdAt      DateTime @default(now())
   sessions       Session[]
   logs           Log[]   
+  refreshTokens  RefreshToken[]
 }
 
 model Session {
@@ -54,4 +55,17 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@index([action])
+}
+
+model RefreshToken {
+  id           String @id @default(uuid())
+  tokenHash    String @unique
+  userId       Int
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @default(now())
+  expiresAt    DateTime
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  used         Boolean @default(false)
+
+  @@index([userId])
 }
