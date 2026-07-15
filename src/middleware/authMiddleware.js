@@ -4,6 +4,7 @@
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import logger from '../utils/logger.js'
+import { ROLES, PERMISSIONS } from '../config/permissions.js'
 
 const prisma = new PrismaClient();
 
@@ -64,4 +65,29 @@ export async function onAcces(req, res, next) {
         return res.status(500).json(err.message || 'Internal Server Error')
     }
     
+}
+
+export function requireRole(...roles) {
+    return (req, res, next) => {
+        if(!req.user.role) {
+            return res.status(403).json({error: "Forbidden: No Role Info"});
+        } else if(!Object.values(ROLES).includes(req.user.role)) { // not array, so ROLES.inlcudes doesnt work
+            // checks if role is in ROLES object .i.e a valid role
+            return res.status(403).json({error: "Forbidden: Invalid Role"});
+        } else if(!roles.includes(req.user.role)) {
+            // checks if the role of the user is in the roles array(...roles) .i.e the user is authorized to access this route
+            return res.status(403).json({error: "Forbidden: Insufficient Role"});
+        }
+        next();
+    }
+}
+
+export function requirePerm(permission) {
+    return (req, res, next) => {
+        // first checks if role is in PERMISSIONS object, then if permission is in that role
+        if(!PERMISSIONS[req.user.role]?.includes(permission)) {
+            return res.status(403).json({error: "Forbidden: Insufficient Permissions"});
+        }
+        next();
+    }
 }
