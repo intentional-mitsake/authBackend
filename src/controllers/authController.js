@@ -121,4 +121,128 @@ export async function rotateController(req, res) {
         }
 }
 
+export async function getProfile(req, res) {
+    try {
+        const userId = req.user.id;
+        if(!userId) {
+            logger.error("No User ID Found");
+            return res.status(400).json({ error: "Bad Request" });
+        }
+        const user = await prisma.user.findUnique({ 
+            where: { 
+                id: userId
+            }, 
+            select: {
+                id: true,
+                email: true,
+                username: true,
+                role: true,
+                createdAt: true
+            }
+        });
+        if (!user) {
+            logger.error("User Not Found");
+            return res.status(404).json({ error: "User Not Found" });
+        }
+        logger.info({ userId }, "User Profile Fetched");
+        return res.status(200).json({ user });
+    } catch(err) {
+        logger.error(err, "Get Profile Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}
+
+export async function getUsers(req, res) {
+    try {
+        const users = await prisma.user.findMany({
+            select: {
+                id: true,
+                email: true,
+                username: true,
+                role: true,
+                createdAt: true
+            }
+        });
+        logger.info("Users Fetched");
+        return res.status(200).json({ users });
+    } catch(err) {
+        logger.error(err, "Get Users Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}
+
+export async function promoteUser(req, res) {
+    try {
+        // target user
+        const { userId } = req.params; // string
+        // promotion role
+        const { role } = req.body;
+        if( role === null || !Object.values(ROLES).includes(role)) {
+            return res.status(400).json({ error: "Invalid Role" });
+        } else if (role === ROLES.ADMIN) {
+            return res.status(403).json({ error: "Forbidden: Cannot promote to Admin" });
+        } else if (parseInt(userId) === req.user.id) {
+            return res.status(403).json({ error: "Forbidden: Cannot change self" });
+        }
+        const user = await prisma.user.update({
+            where: { id: parseInt(userId) },
+            data: { role: role },
+            select: { id: true, email: true, username: true, role: true }
+        });
+        logger.info({ userId }, "User Promoted");
+        return res.status(200).json({ user });
+    } catch(err) {
+        logger.error(err, "Promote User Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}
+
+export async function banUser(req, res) {
+    try {
+        // target user
+        const { userId } = req.params; // string
+        if (parseInt(userId) === req.user.id) {
+            return res.status(403).json({ error: "Forbidden: Cannot ban self" });
+        }
+        const user = await prisma.user.update({
+            where: { id: parseInt(userId) },
+            data: { banned: true },
+            select: { id: true, email: true, username: true, role: true }
+        });
+        logger.info({ userId }, "User Banned");
+        return res.status(200).json({ user });
+    } catch(err) {
+        logger.error(err, "Ban User Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}
+
+export async function restoreUser(req, res) {
+    try {
+        // target user
+        const { userId } = req.params; // string
+        const user = await prisma.user.update({
+            where: { id: parseInt(userId) },
+            data: { banned: false },
+            select: { id: true, email: true, username: true, role: true }
+        });
+        logger.info({ userId }, "User Restored");
+        return res.status(200).json({ user });
+    } catch(err) {
+        logger.error(err, "Restore User Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}
+
+export async function auditLogs(req, res) {
+    try {
+        const logs = await prisma.auditLog.findMany();
+        logger.info("Audit Logs Fetched");
+        return res.status(200).json({ logs });
+    } catch(err) {
+        logger.error(err, "Audit Logs Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}
+
 export default { regCredVerification, logCredVerification, stateController, sessionController, rotateController }
