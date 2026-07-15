@@ -19,7 +19,7 @@ export async function registration(email, password, username, ip) {
         logger.info({ email, username }, "User Registered");
         //payload here is userid, sign is JWT SECRET KEY--> we get userid during token verification(authMiddleware) because the payload is userid
         //if we want to get more than just userid during tokenVerfication for protected route functionalites we need to add those fields into the payload as well
-        const { accessToken, refreshToken, hashedRefToken } = generateTokens({ id: newUser.id });// pasing id as payload
+        const { accessToken, refreshToken, hashedRefToken } = generateTokens({ id: newUser.id, role: newUser.role });// pasing id as payload
         logger.info({userId: newUser.id}, "Token Generated");
         const tokenExp = new Date(Date.now() + 60 * 60 * 1000);
         await prisma.refreshToken.create({
@@ -43,7 +43,9 @@ export async function login(user, password, ip) {
                 if(!process.env.JWT_SECRET_KEY) { 
                     throw new Error("JWT KEY not set in enviroment variables");
                 }
-                const { accessToken, refreshToken, hashedRefToken } =  generateTokens({ id: user.id }); 
+                // payload is id + role, when tokenVerification decodes a jwt access token, it gets the payload
+                // i.e, on login, id and role is extracted from token
+                const { accessToken, refreshToken, hashedRefToken } =  generateTokens({ id: user.id, role: user.role }); 
                 await prisma.refreshToken.create({
                     data : { tokenHash: hashedRefToken, userId: user.id, familyId: randomUUID(), createdAt: new Date(Date.now()), expiresAt: new Date(Date.now() + 60 * 60 * 1000) }
                 })
