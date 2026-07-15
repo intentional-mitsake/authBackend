@@ -6,6 +6,7 @@ import auditLogger from '../utils/auditLogger.js';
 import { metrics } from '../utils/metrics.js';
 import { rotateRefreshToken, generateTokens, revokeRefreshToken } from './tokenServices.js';
 import { randomUUID } from 'crypto';
+import { ROLES } from '../config/permissions.js';
 
 const prisma = new PrismaClient()
 
@@ -78,4 +79,80 @@ export async function logout(req, res) {
         return res.status(500).json(err.message || 'Internal Server Error')
     }
     
+}
+
+export async function getProfile(req, res) {
+    try {
+        const userId = req.user.id;
+        if(!userId) {
+            logger.error("No User ID Found");
+            return res.status(400).json({ error: "Bad Request" });
+        }
+        const user = await prisma.user.findUnique({ 
+            where: { 
+                id: userId
+            }, 
+            select: {
+                id: true,
+                email: true,
+                username: true,
+                role: true,
+                createdAt: true
+            }
+        });
+        if (!user) {
+            logger.error("User Not Found");
+            return res.status(404).json({ error: "User Not Found" });
+        }
+        logger.info({ userId }, "User Profile Fetched");
+        return res.status(200).json({ user });
+    } catch(err) {
+        logger.error(err, "Get Profile Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}
+
+export async function getUsers(req, res) {
+    try {
+        const users = await prisma.user.findMany({
+            select: {
+                id: true,
+                email: true,
+                username: true,
+                role: true,
+                createdAt: true
+            }
+        });
+        logger.info("Users Fetched");
+        return res.status(200).json({ users });
+    } catch(err) {
+        logger.error(err, "Get Users Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}
+
+export async function promoteUser(req, res) {
+    try {
+        // target user
+        const { userId } = req.params; // string
+        // promotion role
+        const { role } = req.body;
+        if( role === null || !Object.values(ROLES).includes(role)) {
+            return res.status(400).json({ error: "Invalid Role" });
+        } else if (role === ROLES.ADMIN) {
+            return res.status(403).json({ error: "Forbidden: Cannot promote to Admin" });
+        } else if (parseInt(userId) === req.user.id) {
+            return res.status(403).json({ error: "Forbidden: Cannot change self" });
+        }
+        const user = await prisma.user.update({
+            where: { id: parseInt(userId) },
+            data: { role: role },
+            select: { id: true, email: true, username: true, role: true }
+        });
+        logger.info({ userId }, "User Promoted");
+        return res.status(200).json({ user });
+    } catch(err) {
+        logger.error(err, "Promote User Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
 }
