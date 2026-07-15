@@ -156,3 +156,40 @@ export async function promoteUser(req, res) {
         return res.status(500).json({ error: err.message || "Internal Server Error" });
     }
 }
+
+export async function banUser(req, res) {
+    try {
+        // target user
+        const { userId } = req.params; // string
+        if (parseInt(userId) === req.user.id) {
+            return res.status(403).json({ error: "Forbidden: Cannot ban self" });
+        }
+        const user = await prisma.user.update({
+            where: { id: parseInt(userId) },
+            data: { banned: true },
+            select: { id: true, email: true, username: true, role: true }
+        });
+        logger.info({ userId }, "User Banned");
+        return res.status(200).json({ user });
+    } catch(err) {
+        logger.error(err, "Ban User Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}
+
+export async function restoreUser(req, res) {
+    try {
+        // target user
+        const { userId } = req.params; // string
+        const user = await prisma.user.update({
+            where: { id: parseInt(userId) },
+            data: { banned: false },
+            select: { id: true, email: true, username: true, role: true }
+        });
+        logger.info({ userId }, "User Restored");
+        return res.status(200).json({ user });
+    } catch(err) {
+        logger.error(err, "Restore User Error");
+        return res.status(500).json({ error: err.message || "Internal Server Error" });
+    }
+}

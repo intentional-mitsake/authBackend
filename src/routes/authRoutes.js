@@ -3,7 +3,7 @@ import { registerValidator, logValidator } from '../middleware/ authValidator.js
 import { regCredVerification, logCredVerification, rotateController, stateController, sessionController } from '../controllers/authController.js'
 import { ratelimiter } from '../middleware/rate_limiter.js'
 import { requireRole, tokenVerification } from '../middleware/authMiddleware.js'
-import { logout, getProfile, getUsers, promoteUser } from '../services/authServices.js'
+import { logout, getProfile, getUsers, promoteUser, banUser, restoreUser } from '../services/authServices.js'
 import { healthCheck } from '../services/healthServices.js'
 import { metrics } from '../utils/metrics.js'
 import { rotateRefreshToken } from '../services/tokenServices.js'
@@ -32,5 +32,7 @@ router.get('/user', ratelimiter, tokenVerification, requireRole('admin', 'user')
 // admin endpoints
 router.get('/admin/users', ratelimiter, tokenVerification, requireRole('admin'), getUsers)
 router.patch('/admin/users/:id/role', ratelimiter, tokenVerification, requireRole('admin'), promoteUser)
+router.patch('/admin/users/:id/ban', ratelimiter, tokenVerification, requireRole('admin'), banUser)
+router.patch('/admin/users/:id/restore', ratelimiter, tokenVerification, requireRole('admin',), restoreUser)
 
 export default router

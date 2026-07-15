@@ -26,6 +26,7 @@ model User {
   username       String   @unique
   emailVerified  DateTime?
   createdAt      DateTime @default(now())
+  banned         Boolean  @default(false)
   refreshTokens  RefreshToken[]
 }
 
