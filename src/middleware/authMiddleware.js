@@ -28,6 +28,7 @@ export async function tokenVerification(req, res, next) {
 
          //the payload during token gen was userid, now we can attach it to the req so that we can identify which session to delete
          req.userid = decoded.id
+         req.user.role = decoded.role
          //session table has id as prim key and token as unique so it needs one of those two in the condition to delete
          req.token = token
          logger.info(decoded, "Token Verified");
