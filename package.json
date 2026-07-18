@@ -9,6 +9,9 @@
     "dev": "nodemon ./src/server.js",
     "start": "node ./src/server.js"
   },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/gaurab7/authBackend.git"
