@@ -1,35 +1,250 @@
 # AuthBackend
 
-Authentication backend built with Node.js, Express, and Prisma.
+A production-grade authentication and authorisation service built with Node.js, Express, PostgreSQL, and Redis.
+
+---
 
 ## Features
 
-- User registration with validation and password hashing (bcrypt)
-- User login with JWT access token + refresh token issuance
-- Refresh token rotation with reuse detection and family-based invalidation
-- Multi-device session management — list, selectively revoke, or bulk-revoke sessions
-- Middleware for token verification and session expiry checks
-- Logout functionality with session deletion and audit logging
-- Sliding window log rate limiting (Redis-backed with in-memory fallback) on all auth routes
-- Structured logging with pino and audit trail for all auth events
-- Health check and readiness endpoints 
-- Prisma ORM for database interaction
+- **Stateful JWT auth** — 15-minute access tokens issued on login, verified on every protected request without a DB call
+- **Refresh token rotation** — 7-day UUID refresh tokens stored as SHA-256 hashes; rotated on every use with token family tracking for reuse detection and full family invalidation on replay attacks
+- **Multi-device session management** — each login creates a new token family; users can list and remotely revoke individual sessions
+- **Role-based access control** — three roles (USER, MODERATOR, ADMIN) with a fine-grained permission map guarding every protected route
+- **Redis-backed sliding window rate limiting** — per-IP for unauthenticated routes, per-user-ID for authenticated routes, with in-memory fallback if Redis is unavailable
+- **Structured audit logging** — every auth event written to a persistent AuditLog table with userId, action, IP address, and timestamp
+- **Structured application logging** — pino with pretty-printing in development and JSON in production
+- **Observability endpoints** — `/health` checks DB and Redis connectivity; `/metrics` exposes request, failure, and token counters
+- **Input validation** — validator.js on all auth inputs; email format, field presence, and password strength enforced before any DB or bcrypt call
+
+---
 
 ## Tech Stack
 
-- Node.js + Express.js
-- Prisma ORM + PostgreSQL
-- Redis (ioredis) for rate limiter state
-- bcrypt for password hashing
-- jsonwebtoken (JWT) for access and refresh tokens
-- pino for structured logging
-- Jest for unit and integration tests
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js 22 |
+| Framework | Express |
+| Database | PostgreSQL |
+| ORM | Prisma |
+| Cache / Rate limit | Redis (ioredis + node-redis) |
+| Auth | JWT (jsonwebtoken) + bcryptjs |
+| Logging | pino + pino-pretty |
+| Validation | validator.js |
 
-## To Add
+---
 
-- Email verification (OTP + magic link)
-- RBAC
-- Password reset flow
-- Docker + nginx production setup
-- Frontend dashboard (Vite + React + Tailwind)
-- OpenAPI/Swagger documentation
+## Architecture
+
+```
+Client
+  │
+  ▼
+[Express]
+  │
+  ├── [Rate Limiter Middleware]     sliding window, Redis-backed, per-IP + per-user-ID
+  │       │
+  │       ▼
+  ├── [Validator Middleware]        email format, field presence, password strength
+  │       │
+  │       ▼
+  ├── [JWT Middleware]              verifies access token, sets req.user
+  │       │
+  │       ▼
+  ├── [RBAC Middleware]             requireRole / requirePerm
+  │       │
+  │       ▼
+  └── [Route Handler]
+          │
+          ├── [Prisma] ──────────► PostgreSQL
+          │
+          ├── [Audit Logger] ────► AuditLog table
+          │
+          └── [pino logger] ─────► stdout
+```
+
+---
+
+## API Reference
+
+### Auth
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/register` | None | Register new user; returns access token + sets refresh cookie |
+| POST | `/auth/login` | None | Login; returns access token + sets refresh cookie |
+| POST | `/auth/refresh` | Cookie | Rotate refresh token; returns new access token |
+| POST | `/auth/logout` | Bearer | Revoke refresh token, clear cookie |
+| GET | `/auth/sessions` | Bearer | List active sessions for current user |
+| DELETE | `/auth/sessions/:familyId` | Bearer | Revoke a specific device session |
+| DELETE | `/auth/sessions` | Bearer | Revoke all sessions (logout everywhere) |
+
+### User
+
+| Method | Path | Auth | Role | Description |
+|---|---|---|---|---|
+| GET | `/user` | Bearer | USER+ | Get own profile (no password) |
+
+### Admin
+
+| Method | Path | Auth | Role | Description |
+|---|---|---|---|---|
+| PATCH | `/admin/users/:id/role` | Bearer | ADMIN | Promote or demote a user (cannot set ADMIN, cannot change self) |
+| PATCH | `/admin/users/:id/ban` | Bearer | ADMIN | Ban a user |
+| PATCH | `/admin/users/:id/restore` | Bearer | ADMIN | Unban a user |
+| GET | `/admin/audit-log` | Bearer | ADMIN | Paginated audit log (`?page=1&limit=20`) |
+
+### Observability
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/health` | None | DB + Redis status, uptime, version |
+| GET | `/metrics` | None | Request, failure, and token counters |
+
+---
+
+## Rate Limit Presets
+
+| Route | Algorithm | Window | Max Requests |
+|---|---|---|---|
+| `/auth/login` | Sliding window | 1 hour | 5 |
+| `/auth/register` | Sliding window | 1 hour | 5 |
+| All others | Sliding window | 1 hour | 100 |
+
+Requests over the limit receive `429 Too Many Requests` with `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers.
+
+---
+
+## Refresh Token Flow
+
+```
+Login
+  │
+  ├── access token (JWT, 15min)  ──► response body
+  └── refresh token (UUID, 7d)   ──► httpOnly cookie + hashed in DB with familyId
+
+Protected request
+  └── Bearer access token ──► JWT middleware verifies, no DB call
+
+Access token expires
+  └── POST /auth/refresh
+        ├── reads cookie
+        ├── hashes token, looks up in DB
+        ├── checks used === false and expiresAt > now
+        ├── marks old token used: true
+        ├── creates new token in same familyId
+        └── returns new access token + sets new cookie
+
+Reuse attack detected (stolen token replayed)
+  └── server sees used: true
+        └── invalidates entire familyId ──► all devices logged out
+```
+
+---
+
+## RBAC
+
+### Roles
+
+| Role | Description |
+|---|---|
+| USER | Default role on registration |
+| MODERATOR | Elevated content access |
+| ADMIN | Full system access; assigned via seed or admin promotion |
+
+### Permissions
+
+| Permission | USER | MODERATOR | ADMIN |
+|---|---|---|---|
+| profile:read | ✓ | ✓ | ✓ |
+| profile:update | ✓ | ✓ | ✓ |
+| content:moderate | | ✓ | ✓ |
+| user:list | | ✓ | ✓ |
+| user:delete | | | ✓ |
+| user:promote | | | ✓ |
+| audit:read | | | ✓ |
+
+---
+
+## Audit Log Events
+
+| Event | Trigger |
+|---|---|
+| `Registration` | New user created |
+| `Login` | Successful login |
+| `Login` (failed) | Wrong password |
+
+Each event stores `userId`, `action`, `ip`, and `createdAt`. Queryable via `GET /admin/audit-log`.
+
+---
+
+## Seed Credentials
+
+Run the seed script to create three users with distinct roles:
+
+```bash
+node prisma/seed.js
+```
+
+| Email | Password | Role |
+|---|---|---|
+| admin@test.com | Admin123! | ADMIN |
+| mod@test.com | Mod123! | MODERATOR |
+| user@test.com | User123! | USER |
+
+---
+
+## Getting Started
+
+```bash
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+
+# Run migrations
+npx prisma migrate dev
+
+# Seed the database
+node prisma/seed.js
+
+# Start the server
+npm run dev
+```
+
+---
+
+## Project Structure
+
+```
+src/
+├── config/
+│   ├── permissions.js      # ROLES, PERMISSIONS map, requireRole, requirePerm
+│   └── ratelimitConfigs.js # Rate limit presets per route
+├── middleware/
+│   ├── rate_limiter.js     # Sliding window, Redis + fallback
+│   ├── tokenVerification.js# JWT verification, sets req.user
+│   └── validators.js       # Input validation for register + login
+├── routes/
+│   ├── authRoutes.js
+│   ├── userRoutes.js
+│   ├── adminRoutes.js
+│   └── healthRoutes.js
+├── controllers/
+│   ├── authController.js
+│   ├── userController.js
+│   └── adminController.js
+├── services/
+│   ├── authServices.js     # registration, login, logout
+│   ├── tokenServices.js    # generateTokens, rotateRefreshToken, invalidateFamily
+│   └── redisFallback.js    # ioredis in-memory fallback
+└── utils/
+    ├── logger.js           # pino singleton
+    ├── auditLogger.js      # writes to AuditLog table
+    └── metrics.js          # in-memory counters
+
+prisma/
+├── schema.prisma
+├── seed.js
+└── migrations/
+```
