@@ -18,7 +18,7 @@ router.post('/auth/register', ratelimiter, registerValidator, regCredVerificatio
 router.post('/auth/login', ratelimiter, logValidator, logCredVerification)
 router.post('/auth/refresh', ratelimiter, rotateController, rotateRefreshToken)
 router.get('/auth/sessions', ratelimiter, tokenVerification, stateController)
-router.post('/auth/session', ratelimiter, tokenVerification, sessionController)
+router.delete('/auth/session', ratelimiter, tokenVerification, sessionController)
 
 //logout
 router.post('/auth/logout', ratelimiter, tokenVerification,  logout)
