@@ -2,8 +2,16 @@ import express from 'express'
 import authRoutes from '../src/routes/authRoutes.js'
 import logger from './utils/logger.js'
 import cookieParser from 'cookie-parser';
+import cors from 'cors';
 
 const app = express()
+
+app.use(cors(
+     {
+          origin: 'http://127.0.0.1:5500',// this is the url of the frontend
+          credentials: true
+     }
+));
 
 app.use(express.json())
 app.use(cookieParser());
