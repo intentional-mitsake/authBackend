@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Home · AuthBackend</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+ 
+<nav id="nav"></nav>
+ 
+<div class="page">
+  <div class="page-title">Dashboard</div>
+  <div class="page-sub">Your profile, active sessions, and system status.</div>
+ 
+  <!-- SYSTEM STATUS -->
+  <div class="grid grid-3" style="margin-bottom:20px">
+    <div class="stat">
+      <div class="stat-val" id="s-requests">—</div>
+      <div class="stat-lbl">Total Requests</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="s-failures">—</div>
+      <div class="stat-lbl">Auth Failures</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="s-tokens">—</div>
+      <div class="stat-lbl">Tokens Issued</div>
+    </div>
+  </div>
+ 
+  <div class="grid grid-2">
+ 
+    <!-- PROFILE -->
+    <div class="card">
+      <h3>Profile</h3>
+      <div id="profile-data" class="empty">Loading…</div>
+    </div>
+ 
+    <!-- HEALTH -->
+    <div class="card">
+      <h3>System Health</h3>
+      <div id="health-data" class="empty">Loading…</div>
+    </div>
+ 
+  </div>
+ 
+  <!-- SESSIONS -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="margin:0">Active Sessions</h3>
+      <button class="btn btn-ghost btn-sm btn-danger" onclick="revokeAll()">Revoke All</button>
+    </div>
+    <div class="alert alert-error" id="sess-err"></div>
+    <div id="sessions-data" class="empty">Loading…</div>
+  </div>
+ 
+</div>
+ 
+<script src="app.js"></script>
+<script>
+  if (!requireAuth()) throw new Error();
+  buildNav();
+ 
+  async function loadProfile() {
+    const res  = await api('GET', '/user');
+    if (!res) return;
+    const data = await res.json();
+    const el   = document.getElementById('profile-data');
+    if (res.ok) {
+      const u = data.user;
+      el.innerHTML = `
+        <div class="p-row"><span class="p-key">ID</span><span class="p-val">${u.id}</span></div>
+        <div class="p-row"><span class="p-key">Email</span><span class="p-val">${u.email}</span></div>
+        <div class="p-row"><span class="p-key">Username</span><span class="p-val">${u.username}</span></div>
+        <div class="p-row"><span class="p-key">Role</span><span class="p-val"><span class="role role-${u.role}">${u.role}</span></span></div>
+        <div class="p-row"><span class="p-key">Created</span><span class="p-val">${new Date(u.createdAt).toLocaleString()}</span></div>
+      `;
+    } else {
+      el.innerHTML = `<span class="empty">${data.error || 'Failed to load.'}</span>`;
+    }
+  }
+ 
+  async function loadHealth() {
+    const res  = await api('GET', '/health', null, false);
+    if (!res) return;
+    const data = await res.json();
+    document.getElementById('health-data').innerHTML = `
+      <div class="p-row"><span class="p-key">Status</span><span class="p-val health-up">${data.status}</span></div>
+      <div class="p-row"><span class="p-key">Database</span><span class="p-val ${data.db === 'up' ? 'health-up' : 'health-down'}">${data.db}</span></div>
+      <div class="p-row"><span class="p-key">Redis</span><span class="p-val ${data.redis === 'up' ? 'health-up' : 'health-down'}">${data.redis}</span></div>
+      <div class="p-row"><span class="p-key">Uptime</span><span class="p-val">${Math.floor(data.uptime)}s</span></div>
+      <div class="p-row"><span class="p-key">Version</span><span class="p-val">${data.version}</span></div>
+    `;
+  }
+ 
+  async function loadMetrics() {
+    const res  = await api('GET', '/metrics', null, false);
+    if (!res) return;
+    const data = await res.json();
+    document.getElementById('s-requests').textContent = data.requests_total ?? '—';
+    document.getElementById('s-failures').textContent = data.auth_failures_total ?? '—';
+    document.getElementById('s-tokens').textContent   = data.tokens_issued_total ?? '—';
+  }
+ 
+  async function loadSessions() {
+    const res  = await api('GET', '/auth/sessions');
+    if (!res) return;
+    const data = await res.json();
+    const el   = document.getElementById('sessions-data');
+    if (res.ok && data.activeSessions?.length) {
+      el.innerHTML = data.activeSessions.map(s => `
+        <div class="session-row">
+          <div>
+            <div class="session-id">${s.familyId}</div>
+            <div class="session-meta">
+              Created: ${new Date(s.createdAt).toLocaleString()}
+              &nbsp;·&nbsp;
+              Last used: ${new Date(s.lastUsedAt).toLocaleString()}
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm btn-danger" onclick="revokeSession('${s.familyId}')">Revoke</button>
+        </div>
+      `).join('');
+    } else if (res.ok) {
+      el.innerHTML = '<span class="empty">No active sessions.</span>';
+    } else {
+      showAlert('sess-err', data.error || 'Failed to load sessions.', 'error');
+    }
+    // to know if its empty, meaning all sessions have been revoked
+    return data.activeSessions.length;
+  }
+ 
+  async function revokeSession(familyId) {
+    await api('DELETE', `/auth/session/${familyId}`);
+    // reload the sessions list
+    const num = await loadSessions();
+    if (num === 0) {
+        // if all sessions have been revoked, clear the access token
+        clearToken();
+        window.location.href = 'login.html';
+    }
+  }
+ 
+  async function revokeAll() {
+    //currently doesnt exist
+    await api('DELETE', '/auth/sessions');
+    // after revoking all sessions, cleaer the access token so even if 15 minutes left, user will be logged out
+    clearToken();
+    // redirect to login
+    window.location.href = 'login.html';
+  }
+ 
+  loadProfile();
+  loadHealth();
+  loadMetrics();
+  loadSessions();
+</script>
+</body>
+</html>

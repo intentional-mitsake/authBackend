@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin · AuthBackend</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+ 
+<nav id="nav"></nav>
+ 
+<div class="page">
+  <div class="page-title">Admin Dashboard</div>
+  <div class="page-sub">Manage users, roles, and view audit logs.</div>
+ 
+  <div class="alert alert-success" id="ok"></div>
+  <div class="alert alert-error" id="err"></div>
+ 
+  <!-- USERS TABLE -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 style="margin:0">Users</h3>
+      <button class="btn btn-ghost btn-sm" onclick="loadUsers()">Refresh</button>
+    </div>
+    <div id="users-table" class="empty">Loading…</div>
+  </div>
+ 
+  <!-- PROMOTE FORM -->
+  <div class="card">
+    <h3>Change Role</h3>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div class="form-group" style="margin:0">
+        <label>User ID</label>
+        <input id="promote-id" type="text" placeholder="12" style="width:120px" />
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>New Role</label>
+        <select id="promote-role">
+          <option value="user">user</option>
+          <option value="mod">mod</option>
+        </select>
+      </div>
+      <button class="btn btn-warn btn-sm" onclick="doPromote()" style="margin-bottom:1px">Update Role</button>
+    </div>
+  </div>
+ 
+</div>
+ 
+<!-- AUDIT LOG MODAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Audit Log</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="modal-body" class="empty">Loading…</div>
+    <div style="display:flex;gap:8px;margin-top:16px;align-items:center">
+      <button class="btn btn-ghost btn-sm" id="prev-btn" onclick="changePage(-1)" style="display:none">← Prev</button>
+      <button class="btn btn-ghost btn-sm" id="next-btn" onclick="changePage(1)" style="display:none">Next →</button>
+      <span id="page-info" style="font-size:12px;color:var(--muted);font-family:var(--mono)"></span>
+    </div>
+  </div>
+</div>
+ 
+<script src="app.js"></script>
+<script>
+  if (!requireAdmin()) throw new Error();
+  buildNav();
+ 
+  let currentUserId = null;
+  let currentPage   = 1;
+  let totalPages    = 1;
+ 
+  async function loadUsers() {
+    const res  = await api('GET', '/admin/users');
+    if (!res) return;
+    const data = await res.json();
+    const el   = document.getElementById('users-table');
+ 
+    if (res.ok && data.users?.length) {
+      el.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Email</th>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.users.map(u => `
+              <tr>
+                <td style="font-family:var(--mono);color:var(--muted)">${u.id}</td>
+                <td>${u.email}</td>
+                <td>${u.username}</td>
+                <td><span class="role role-${u.role}">${u.role}</span></td>
+                <td>
+                  <span class="status ${u.banned ? 'status-ban' : 'status-ok'}">
+                    ${u.banned ? 'banned' : 'active'}
+                  </span>
+                </td>
+                <td style="display:flex;gap:6px;flex-wrap:wrap">
+                  ${u.banned
+                    ? `<button class="btn btn-ghost btn-sm" onclick="doRestore(${u.id})">Restore</button>`
+                    : `<button class="btn btn-danger btn-sm" onclick="doBan(${u.id})">Ban</button>`
+                  }
+                  <button class="btn btn-ghost btn-sm" onclick="openAuditLog(${u.id}, '${u.username}')">Audit Log</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    } else if (res.ok) {
+      el.innerHTML = '<span class="empty">No users found.</span>';
+    } else {
+      showAlert('err', data.error || 'Failed to load users.', 'error');
+    }
+  }
+ 
+  async function doPromote() {
+    const id   = document.getElementById('promote-id').value.trim();
+    const role = document.getElementById('promote-role').value;
+    if (!id) return showAlert('err', 'Enter a user ID.', 'error');
+    const res  = await api('PATCH', `/admin/users/${id}/role`, { role });
+    if (!res) return;
+    const data = await res.json();
+    if (res.ok) { showAlert('ok', `User ${id} role updated to ${role}.`, 'success'); loadUsers(); }
+    else showAlert('err', data.error || 'Failed.', 'error');
+  }
+ 
+  async function doBan(id) {
+    const res  = await api('PATCH', `/admin/users/${id}/ban`);
+    if (!res) return;
+    const data = await res.json();
+    if (res.ok) { showAlert('ok', `User ${id} banned.`, 'success'); loadUsers(); }
+    else showAlert('err', data.error || 'Failed.', 'error');
+  }
+ 
+  async function doRestore(id) {
+    const res  = await api('PATCH', `/admin/users/${id}/restore`);
+    if (!res) return;
+    const data = await res.json();
+    if (res.ok) { showAlert('ok', `User ${id} restored.`, 'success'); loadUsers(); }
+    else showAlert('err', data.error || 'Failed.', 'error');
+  }
+ 
+  // ── AUDIT LOG MODAL ──
+  async function openAuditLog(userId, username) {
+    currentUserId = userId;
+    currentPage   = 1;
+    document.getElementById('modal-title').textContent = `Audit Log — ${username} (id:${userId})`;
+    document.getElementById('modal').classList.add('show');
+    await loadAuditPage();
+  }
+ 
+  function closeModal() {
+    document.getElementById('modal').classList.remove('show');
+    currentUserId = null;
+  }
+ 
+  async function loadAuditPage() {
+    const res  = await api('GET', `/admin/users/${currentUserId}?page=${currentPage}&limit=10`);
+    if (!res) return;
+    const data = await res.json();
+    const el   = document.getElementById('modal-body');
+ 
+    if (res.ok) {
+      totalPages = data.pages || 1;
+      document.getElementById('page-info').textContent = `page ${data.page} of ${totalPages} (${data.total} total)`;
+      document.getElementById('prev-btn').style.display = currentPage > 1 ? 'inline-block' : 'none';
+      document.getElementById('next-btn').style.display = currentPage < totalPages ? 'inline-block' : 'none';
+ 
+      if (data.logs?.length) {
+        el.innerHTML = `
+          <table>
+            <thead>
+              <tr><th>Time</th><th>Action</th><th>IP</th><th>Data</th></tr>
+            </thead>
+            <tbody>
+              ${data.logs.map(l => `
+                <tr>
+                  <td style="font-family:var(--mono);font-size:11px;white-space:nowrap;color:var(--muted)">
+                    ${new Date(l.createdAt).toLocaleString()}
+                  </td>
+                  <td style="font-family:var(--mono);font-size:12px">${l.action}</td>
+                  <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">${l.ipAddress ?? '—'}</td>
+                  <td style="font-family:var(--mono);font-size:11px;color:var(--muted)">
+                    ${l.data ? JSON.stringify(l.data).slice(0, 50) : '—'}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } else {
+        el.innerHTML = '<span class="empty">No audit events for this user.</span>';
+      }
+    } else {
+      el.innerHTML = `<span class="empty">${data.error || 'Failed to load.'}</span>`;
+    }
+  }
+ 
+  async function changePage(dir) {
+    currentPage = Math.max(1, Math.min(totalPages, currentPage + dir));
+    await loadAuditPage();
+  }
+ 
+  // close modal on background click
+  document.getElementById('modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal')) closeModal();
+  });
+ 
+  loadUsers();
+</script>
+</body>
+</html>

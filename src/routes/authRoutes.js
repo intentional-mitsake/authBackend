@@ -28,12 +28,12 @@ router.get('/health', healthCheck)
 router.get('/metrics', (req, res) => res.json(metrics))
 
 // user info
-router.get('/user', ratelimiter, tokenVerification, requireRole('admin', 'user'), getProfile)
+router.get('/user', ratelimiter, tokenVerification, requireRole('ADMIN', 'USER'), getProfile)
 // admin endpoints
-router.get('/admin/users', ratelimiter, tokenVerification, requireRole('admin'), getUsers)
-router.patch('/admin/users/:id/role', ratelimiter, tokenVerification, requireRole('admin'), promoteUser)
-router.patch('/admin/users/:id/ban', ratelimiter, tokenVerification, requireRole('admin'), banUser)
-router.patch('/admin/users/:id/restore', ratelimiter, tokenVerification, requireRole('admin',), restoreUser)
-router.get('/admin/users/:id', ratelimiter, tokenVerification, requireRole('admin', 'mod'), auditLogs)
+router.get('/admin/users', ratelimiter, tokenVerification, requireRole('ADMIN'), getUsers)
+router.patch('/admin/users/:id/role', ratelimiter, tokenVerification, requireRole('ADMIN'), promoteUser)
+router.patch('/admin/users/:id/ban', ratelimiter, tokenVerification, requireRole('ADMIN'), banUser)
+router.patch('/admin/users/:id/restore', ratelimiter, tokenVerification, requireRole('ADMIN',), restoreUser)
+router.get('/admin/users/:id', ratelimiter, tokenVerification, requireRole('ADMIN', 'MOD'), auditLogs)
 
 export default router
