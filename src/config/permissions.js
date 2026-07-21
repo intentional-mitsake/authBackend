@@ -1,7 +1,7 @@
 export const ROLES = {
-    ADMIN: 'admin',
-    MOD : 'mod',
-    USER: 'user'
+    ADMIN: 'ADMIN',
+    MOD : 'MOD',
+    USER: 'USER'
 }
 // permissions for after authentication
 export const PERMISSIONS = {
