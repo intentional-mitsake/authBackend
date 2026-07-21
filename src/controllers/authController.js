@@ -82,7 +82,8 @@ export async function stateController(req, res) {
 
 export async function sessionController(req, res) {
     try {
-        const { userId, familyId } = req.params;
+        const userId = req.user.id;
+        const { familyId } = req.params;
         await revokeSession(userId, familyId);
         logger.info({ userId, familyId }, "Session Revoked");
         return res.status(200).json({ msg: "Session Revoked"});
