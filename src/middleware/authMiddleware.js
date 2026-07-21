@@ -71,6 +71,8 @@ export async function onAcces(req, res, next) {
 
 export function requireRole(...roles) {
     return (req, res, next) => {
+        logger.info(req.user, "Request Role");
+        // figured out that in prisma schema, defualt is USER, causing requireRole to say Forbidden: Ivalid Role
         if(!req.user.role) {
             return res.status(403).json({error: "Forbidden: No Role Info"});
         } else if(!Object.values(ROLES).includes(req.user.role)) { // not array, so ROLES.inlcudes doesnt work
