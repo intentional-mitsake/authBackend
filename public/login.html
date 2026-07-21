@@ -44,12 +44,23 @@
  
   async function doLogin() {
     const email    = document.getElementById('email').value.trim();
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    let username;
     const password = document.getElementById('password').value;
  
     if (!email || !password) return showAlert('err', 'All fields required.', 'error');
- 
-    const res  = await api('POST', '/auth/login', { email, password }, false);
-    const data = await res.json();
+
+    let res;
+    let data;
+    if (!regex.test(email)) {
+      // if email is not a valid email it is probably a username
+      username = document.getElementById('email').value.trim();
+      res  = await api('POST', '/auth/login', { password, username }, false);
+      data = await res.json();
+    } else {
+      res  = await api('POST', '/auth/login', { email, password, username }, false);
+      data = await res.json();
+    }
  
     if (res.ok) {
       setToken(data.accessToken);
