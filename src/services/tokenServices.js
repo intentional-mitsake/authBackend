@@ -12,6 +12,7 @@ export function generateTokens(payload) {
     //short lived access token
     const accessToken = jwt.sign(payload, process.env.JWT_SECRET_KEY, { expiresIn: '1h' });
     const refreshToken = randomUUID(); // rand str
+    //logger.info({ accessToken, refreshToken }, "Tokens Generated");
     const hashedRefToken = createHash('sha256').update(refreshToken).digest('hex'); // hash 
 
     return { accessToken, refreshToken, hashedRefToken };
@@ -44,6 +45,7 @@ export async function invalidateFamily(familyId) {
 
 export async function revokeRefreshToken(refreshToken) {
     const hashedRefToken = createHash('sha256').update(refreshToken).digest('hex');
+    logger.info({ hashedRefToken }, "Refresh Token Revoked");
     await prisma.refreshToken.updateMany({ where: { tokenHash: hashedRefToken }, data: { used: true } });
 }
 

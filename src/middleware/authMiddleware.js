@@ -33,12 +33,6 @@ export async function tokenVerification(req, res, next) {
          //session table has id as prim key and token as unique so it needs one of those two in the condition to delete
          req.token = token
          logger.info(decoded, "Token Verified");
-         //clear cookie
-         res.clearCookie('refreshToken', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-        });
          next()
         })
 }

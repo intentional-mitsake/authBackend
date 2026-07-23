@@ -49,6 +49,7 @@ export async function logCredVerification(req, res) {
             const { accessToken, refreshToken} = await login(user, password, req.ip);
             logger.info({ email, username }, "User Logged In");
             //setting cookie
+            logger.info({ refreshToken }, "Setting Cookie");
             res.cookie(
                 'refreshToken', refreshToken, {
                     httpOnly: true,

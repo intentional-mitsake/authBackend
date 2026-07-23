@@ -76,8 +76,21 @@ export async function logout(req, res) {
         const userid = req.user.id;
         const accessToken = req.token;
         const refreshToken = req.cookies.refreshToken;
-        logger.info({ userid, refreshToken }, "User Logging Out");
-        await revokeRefreshToken(refreshToken);
+        logger.info({ cookies: req.cookies }, "Cookies");
+        logger.info({ refreshToken }, "RT from cookie");
+        //logger.info({ userid, refreshToken }, "User Logging Out");
+        if(refreshToken) {
+            await revokeRefreshToken(refreshToken);
+        } else{
+            logger.warn({ userid }, "Refresh Token Not Found");
+            // accessToken is cleared on the frontedn before any of thsi
+            // so user is logged out regardless
+            // whcih is fine, as user doesnt seem to have refresh token in cookie
+            logger.info({ userid }, "Force Log Out");
+            await auditLogger(userid, "Logout", "Force Log Out Due to No Refresh Token");
+            return res.status(400).json({ error: "Refresh Token Not Found"});
+
+        }
         await auditLogger(userid, "Logout", {});
         logger.info({ userid }, "User Logged Out");
         res.clearCookie('refreshToken', { 
