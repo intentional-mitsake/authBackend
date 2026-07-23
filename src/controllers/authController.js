@@ -21,8 +21,9 @@ export async function regCredVerification(req, res) {
                 return res.status(409).json({ error: "Username already in use!"});
             }else{
                 const { accessToken, refreshToken} = await registration(email, password, username, req.ip); // req.ip is the ip address of the incoing request
-                logger.info({ email, username }, "User Registered");
+                //logger.info({ email, username }, "User Registered");
                 //setting cookie
+                logger.info({ refreshToken }, "Setting Cookie");
                 res.cookie(
                     'refreshToken', refreshToken, {
                         httpOnly: true,
@@ -47,7 +48,7 @@ export async function logCredVerification(req, res) {
         const user = await prisma.user.findFirst({where: { OR: [{ email }, { username }]}})//finds the user with the given email and  username and returns all info
         if(user){ 
             const { accessToken, refreshToken} = await login(user, password, req.ip);
-            logger.info({ email, username }, "User Logged In");
+            //logger.info({ email, username }, "User Logged In");
             //setting cookie
             logger.info({ refreshToken }, "Setting Cookie");
             res.cookie(

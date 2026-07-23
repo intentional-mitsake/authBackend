@@ -45,7 +45,7 @@ export async function invalidateFamily(familyId) {
 
 export async function revokeRefreshToken(refreshToken) {
     const hashedRefToken = createHash('sha256').update(refreshToken).digest('hex');
-    logger.info({ hashedRefToken }, "Refresh Token Revoked");
+    //logger.info({ hashedRefToken }, "Refresh Token Revoked");
     await prisma.refreshToken.updateMany({ where: { tokenHash: hashedRefToken }, data: { used: true } });
 }
 

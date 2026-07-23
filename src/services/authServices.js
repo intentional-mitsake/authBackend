@@ -26,7 +26,7 @@ export async function registration(email, password, username, ip) {
         await prisma.refreshToken.create({
             data: { tokenHash: hashedRefToken, userId: newUser.id, familyId: randomUUID(), createdAt: created, expiresAt: tokenExp }
         });
-        logger.info({ email, username }, "User Logged In");
+        logger.info({ email, username }, "User Registered");
         await auditLogger(newUser.id, "Registration", `ip: ${ip}: User Registered`);
         metrics.tokens_issued_total++;
         return { accessToken, refreshToken }
@@ -76,8 +76,8 @@ export async function logout(req, res) {
         const userid = req.user.id;
         const accessToken = req.token;
         const refreshToken = req.cookies.refreshToken;
-        logger.info({ cookies: req.cookies }, "Cookies");
-        logger.info({ refreshToken }, "RT from cookie");
+        //logger.info({ cookies: req.cookies }, "Cookies");
+        //logger.info({ refreshToken }, "RT from cookie");
         //logger.info({ userid, refreshToken }, "User Logging Out");
         if(refreshToken) {
             await revokeRefreshToken(refreshToken);
