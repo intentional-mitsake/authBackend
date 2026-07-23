@@ -41,6 +41,11 @@ export async function login(user, password, ip) {
     try{
         const match = await bcrypt.compare(password, user.password)//it hashes the pw user provides and compares wiht the hashed pw from DB. Returns true or false
         if(match) { 
+            if (user.banned) {
+                throw new Error("User Banned");
+                logger.info({ userId: user.id }, "Banned User Login Attempt");
+                await auditLogger(user.id, "Login", `ip: ${ip} : Banned User Login Attempt`);
+            }
                 if(!process.env.JWT_SECRET_KEY) { 
                     throw new Error("JWT KEY not set in enviroment variables");
                 }
