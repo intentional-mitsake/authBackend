@@ -73,11 +73,18 @@ export async function login(user, password, ip) {
 
 export async function logout(req, res) {
     try{
-        const userid = req.userid
-        const refreshToken = req.token
+        const userid = req.user.id;
+        const accessToken = req.token;
+        const refreshToken = req.cookies.refreshToken;
+        logger.info({ userid, refreshToken }, "User Logging Out");
         await revokeRefreshToken(refreshToken);
         await auditLogger(userid, "Logout", {});
         logger.info({ userid }, "User Logged Out");
+        res.clearCookie('refreshToken', { 
+             httpOnly: true,
+             secure: process.env.NODE_ENV === 'production',
+             sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+            });
         return res.status(200).json({msg: "User Logged Out"})
     }catch(err){
         logger.error(err, "Logout Error")
