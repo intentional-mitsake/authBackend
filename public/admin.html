@@ -37,8 +37,8 @@
       <div class="form-group" style="margin:0">
         <label>New Role</label>
         <select id="promote-role">
-          <option value="user">user</option>
-          <option value="mod">mod</option>
+          <option value="USER">USER</option>
+          <option value="MOD">MOD</option>
         </select>
       </div>
       <button class="btn btn-warn btn-sm" onclick="doPromote()" style="margin-bottom:1px">Update Role</button>
@@ -125,6 +125,7 @@
   async function doPromote() {
     const id   = document.getElementById('promote-id').value.trim();
     const role = document.getElementById('promote-role').value;
+    console.log(id, role);
     if (!id) return showAlert('err', 'Enter a user ID.', 'error');
     const res  = await api('PATCH', `/admin/users/${id}/role`, { role });
     if (!res) return;

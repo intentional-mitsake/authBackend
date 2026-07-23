@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { registration, login } from '../services/authServices.js';
 import { logger } from '../utils/logger.js';
 import { rotateRefreshToken, listActiveSessions, revokeSession } from '../services/tokenServices.js';
+import { ROLES } from '../config/permissions.js';
 
 
 const prisma = new PrismaClient();
@@ -161,6 +162,7 @@ export async function getUsers(req, res) {
                 email: true,
                 username: true,
                 role: true,
+                banned: true,
                 createdAt: true
             }
         });
@@ -175,7 +177,8 @@ export async function getUsers(req, res) {
 export async function promoteUser(req, res) {
     try {
         // target user
-        const { userId } = req.params; // string
+        const { id } = req.params; // string
+        const userId = parseInt(id, 10);
         // promotion role
         const { role } = req.body;
         if( role === null || !Object.values(ROLES).includes(role)) {
@@ -186,7 +189,7 @@ export async function promoteUser(req, res) {
             return res.status(403).json({ error: "Forbidden: Cannot change self" });
         }
         const user = await prisma.user.update({
-            where: { id: parseInt(userId) },
+            where: { id: userId },
             data: { role: role },
             select: { id: true, email: true, username: true, role: true }
         });
@@ -201,7 +204,8 @@ export async function promoteUser(req, res) {
 export async function banUser(req, res) {
     try {
         // target user
-        const { userId } = req.params; // string
+        const { id } = req.params; // string
+        const userId = parseInt(id, 10);
         if (parseInt(userId) === req.user.id) {
             return res.status(403).json({ error: "Forbidden: Cannot ban self" });
         }
@@ -221,7 +225,11 @@ export async function banUser(req, res) {
 export async function restoreUser(req, res) {
     try {
         // target user
-        const { userId } = req.params; // string
+        const { id } = req.params; // string
+        const userId = parseInt(id, 10);
+        if (parseInt(userId) === req.user.id) {
+            return res.status(403).json({ error: "Forbidden: Cannot restore self" });
+        }
         const user = await prisma.user.update({
             where: { id: parseInt(userId) },
             data: { banned: false },
