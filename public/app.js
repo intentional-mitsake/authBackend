@@ -18,7 +18,7 @@ function requireAuth() {
   return true;
 }
 function requireAdmin() {
-  if (!getToken() || getRole() !== 'admin') { window.location.href = 'home.html'; return false; }
+  if (!getToken() || getRole() !== 'ADMIN') { window.location.href = 'home.html'; return false; }
   return true;
 }
 function redirectIfAuthed() {
