@@ -3,6 +3,10 @@ import authRoutes from '../src/routes/authRoutes.js'
 import logger from './utils/logger.js'
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import dotenv from 'dotenv';
+
+// loading env variables first
+dotenv.config();
 
 const app = express()
 
