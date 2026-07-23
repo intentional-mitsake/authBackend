@@ -33,6 +33,10 @@ export async function ratelimiter(req, res, next) {
     // ioredis is native/built in node module so it is always ready, that is gonna be the fall back
     let multi;// for race conditions, procides atomic operations
     if(!redisClient.isReady){
+      // fall back doesnt work
+      // this is not ht eway to cheack for failure
+      // also the syntax for ioredis is different so wven if it passes, it will not work
+      // will fix this in future
       multi = fallBackRedis.multi();
     } else {
       multi = redisClient.multi();
