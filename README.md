@@ -1,6 +1,6 @@
 # AuthBackend
 
-A production-grade authentication and authorisation service built with Node.js, Express, PostgreSQL, and Redis.
+A production-grade authentication and authorisation service built with Node.js, Express, PostgreSQL, and Redis. Includes a vanilla HTML/CSS/JS frontend for live demonstration.
 
 ---
 
@@ -10,11 +10,13 @@ A production-grade authentication and authorisation service built with Node.js, 
 - **Refresh token rotation** — 7-day UUID refresh tokens stored as SHA-256 hashes; rotated on every use with token family tracking for reuse detection and full family invalidation on replay attacks
 - **Multi-device session management** — each login creates a new token family; users can list and remotely revoke individual sessions
 - **Role-based access control** — three roles (USER, MODERATOR, ADMIN) with a fine-grained permission map guarding every protected route
+- **Account banning** — admins can ban and restore users; banned users are blocked at login
 - **Redis-backed sliding window rate limiting** — per-IP for unauthenticated routes, per-user-ID for authenticated routes, with in-memory fallback if Redis is unavailable
-- **Structured audit logging** — every auth event written to a persistent AuditLog table with userId, action, IP address, and timestamp
+- **Structured audit logging** — every auth event written to a persistent AuditLog table with userId, action, IP address, and timestamp; queryable per-user by admins
 - **Structured application logging** — pino with pretty-printing in development and JSON in production
 - **Observability endpoints** — `/health` checks DB and Redis connectivity; `/metrics` exposes request, failure, and token counters
 - **Input validation** — validator.js on all auth inputs; email format, field presence, and password strength enforced before any DB or bcrypt call
+- **Frontend** — four-page vanilla JS dashboard: register, login, home (profile + sessions + health), admin panel (user management + per-user audit log)
 
 ---
 
@@ -30,6 +32,7 @@ A production-grade authentication and authorisation service built with Node.js, 
 | Auth | JWT (jsonwebtoken) + bcryptjs |
 | Logging | pino + pino-pretty |
 | Validation | validator.js |
+| Frontend | HTML / CSS / Vanilla JS |
 
 ---
 
@@ -71,10 +74,11 @@ Client
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | `/auth/register` | None | Register new user; returns access token + sets refresh cookie |
-| POST | `/auth/login` | None | Login; returns access token + sets refresh cookie |
+| POST | `/auth/login` | None | Login; returns access token + sets refresh cookie. Blocked if account is banned |
 | POST | `/auth/refresh` | Cookie | Rotate refresh token; returns new access token |
 | POST | `/auth/logout` | Bearer | Revoke refresh token, clear cookie |
 | GET | `/auth/sessions` | Bearer | List active sessions for current user |
+| POST | `/auth/session` | Bearer | Manage a specific session |
 | DELETE | `/auth/sessions/:familyId` | Bearer | Revoke a specific device session |
 | DELETE | `/auth/sessions` | Bearer | Revoke all sessions (logout everywhere) |
 
@@ -88,10 +92,11 @@ Client
 
 | Method | Path | Auth | Role | Description |
 |---|---|---|---|---|
+| GET | `/admin/users` | Bearer | ADMIN | Paginated user list |
 | PATCH | `/admin/users/:id/role` | Bearer | ADMIN | Promote or demote a user (cannot set ADMIN, cannot change self) |
 | PATCH | `/admin/users/:id/ban` | Bearer | ADMIN | Ban a user |
 | PATCH | `/admin/users/:id/restore` | Bearer | ADMIN | Unban a user |
-| GET | `/admin/audit-log` | Bearer | ADMIN | Paginated audit log (`?page=1&limit=20`) |
+| GET | `/admin/users/:id` | Bearer | ADMIN / MOD | Paginated audit log for a specific user |
 
 ### Observability
 
@@ -148,7 +153,7 @@ Reuse attack detected (stolen token replayed)
 | Role | Description |
 |---|---|
 | USER | Default role on registration |
-| MODERATOR | Elevated content access |
+| MODERATOR | Can view user list and per-user audit logs |
 | ADMIN | Full system access; assigned via seed or admin promotion |
 
 ### Permissions
@@ -173,7 +178,7 @@ Reuse attack detected (stolen token replayed)
 | `Login` | Successful login |
 | `Login` (failed) | Wrong password |
 
-Each event stores `userId`, `action`, `ip`, and `createdAt`. Queryable via `GET /admin/audit-log`.
+Each event stores `userId`, `action`, `ip`, and `createdAt`. Queryable per-user via `GET /admin/users/:id`.
 
 ---
 
@@ -212,6 +217,31 @@ node prisma/seed.js
 npm run dev
 ```
 
+### Environment Variables
+
+```env
+DATABASE_URL=postgresql://user:password@localhost:5432/authbackend
+REDIS_URL=redis://localhost:6379
+JWT_SECRET_KEY=your-secret-key
+LOG_LEVEL=info
+NODE_ENV=development
+```
+
+---
+
+## Frontend
+
+Open `frontend/login.html` in a browser. All four pages share `style.css` and `app.js` — keep them in the same folder.
+
+| Page | Route | Description |
+|---|---|---|
+| `login.html` | — | Email/username + password login |
+| `register.html` | — | New account creation |
+| `home.html` | Requires auth | Profile, active sessions, health + metrics |
+| `admin.html` | Requires ADMIN role | User table, ban/restore, per-user audit log modal |
+
+Token is stored in `sessionStorage` and auto-refreshed on 401. Admin nav link only appears for ADMIN role.
+
 ---
 
 ## Project Structure
@@ -219,12 +249,12 @@ npm run dev
 ```
 src/
 ├── config/
-│   ├── permissions.js      # ROLES, PERMISSIONS map, requireRole, requirePerm
-│   └── ratelimitConfigs.js # Rate limit presets per route
+│   ├── permissions.js       # ROLES, PERMISSIONS map, requireRole, requirePerm
+│   └── ratelimitConfigs.js  # Rate limit presets per route
 ├── middleware/
-│   ├── rate_limiter.js     # Sliding window, Redis + fallback
-│   ├── tokenVerification.js# JWT verification, sets req.user
-│   └── validators.js       # Input validation for register + login
+│   ├── rate_limiter.js      # Sliding window, Redis + fallback
+│   ├── tokenVerification.js # JWT verification, sets req.user
+│   └── validators.js        # Input validation for register + login
 ├── routes/
 │   ├── authRoutes.js
 │   ├── userRoutes.js
@@ -235,16 +265,24 @@ src/
 │   ├── userController.js
 │   └── adminController.js
 ├── services/
-│   ├── authServices.js     # registration, login, logout
-│   ├── tokenServices.js    # generateTokens, rotateRefreshToken, invalidateFamily
-│   └── redisFallback.js    # ioredis in-memory fallback
+│   ├── authServices.js      # registration, login, logout, banned check
+│   ├── tokenServices.js     # generateTokens, rotateRefreshToken, invalidateFamily
+│   └── redisFallback.js     # ioredis in-memory fallback
 └── utils/
-    ├── logger.js           # pino singleton
-    ├── auditLogger.js      # writes to AuditLog table
-    └── metrics.js          # in-memory counters
+    ├── logger.js            # pino singleton
+    ├── auditLogger.js       # writes to AuditLog table
+    └── metrics.js           # in-memory counters
 
 prisma/
 ├── schema.prisma
 ├── seed.js
 └── migrations/
-```
+
+frontend/
+├── login.html
+├── register.html
+├── home.html
+├── admin.html
+├── style.css
+└── app.js
+```  
