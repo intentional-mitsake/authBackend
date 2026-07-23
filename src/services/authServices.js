@@ -95,8 +95,8 @@ export async function logout(req, res) {
         logger.info({ userid }, "User Logged Out");
         res.clearCookie('refreshToken', { 
              httpOnly: true,
-             secure: process.env.NODE_ENV === 'production',
-             sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+             secure: true,
+             sameSite: 'none',
             });
         return res.status(200).json({msg: "User Logged Out"})
     }catch(err){
