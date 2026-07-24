@@ -76,13 +76,16 @@ function buildNav() {
   const role  = getRole();
   const page  = location.pathname.split('/').pop();
  
+  // if token, show nav with home, admin(if role==ADMIN), user, logout, else login, register
   nav.innerHTML = `
     <a class="brand" href="${token ? 'home.html' : 'login.html'}">
-      <span>//</span> AuthBackend
+      AuthBackend
     </a>
     ${token ? `
       <a href="home.html" class="${page === 'home.html' ? 'active' : ''}">Home</a>
-      ${role === 'admin' ? `<a href="admin.html" class="${page === 'admin.html' ? 'active' : ''}">Admin</a>` : ''}
+      ${role === 'ADMIN' ? `
+        <a href="admin.html" class="${page === 'admin.html' ? 'active' : ''}">Admin</a>
+      ` : ''}
       <span id="nav-user"></span>
       <a href="#" onclick="doLogout(); return false;">Logout</a>
     ` : `
